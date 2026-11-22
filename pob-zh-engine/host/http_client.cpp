@@ -23,6 +23,7 @@
 // settings page writes it on the UI thread while workers open sessions.
 static std::mutex g_proxyMx;
 static std::wstring g_manualProxy; // normalized "host:port"; empty = automatic
+static int g_proxyMode = 1;        // 0 direct, 1 system, 2 manual
 
 namespace {
 std::mutex mirrorMutex;
@@ -83,9 +84,8 @@ std::vector<int> HttpProbeGitHubMirrors()
 	return timings;
 }
 
-void HttpSetManualProxy(const std::wstring& proxy)
+static std::wstring normalize_proxy(std::wstring p)
 {
-	std::wstring p = proxy;
 	while (!p.empty() && iswspace(p.front())) p.erase(p.begin());
 	while (!p.empty() && iswspace(p.back())) p.pop_back();
 	// People paste what their proxy tool shows, which is a URL.
@@ -96,18 +96,36 @@ void HttpSetManualProxy(const std::wstring& proxy)
 	stripPrefix(L"http://");
 	stripPrefix(L"https://");
 	while (!p.empty() && p.back() == L'/') p.pop_back();
+	return p;
+}
+
+void HttpSetProxyMode(int mode, const std::wstring& proxy)
+{
 	std::lock_guard<std::mutex> lk(g_proxyMx);
-	g_manualProxy = p;
+	g_proxyMode = mode >= 0 && mode <= 2 ? mode : 1;
+	g_manualProxy = normalize_proxy(proxy);
+	if (g_proxyMode == 2 && g_manualProxy.empty()) g_proxyMode = 1;
+}
+
+void HttpSetManualProxy(const std::wstring& proxy)
+{
+	HttpSetProxyMode(proxy.empty() ? 1 : 2, proxy);
 }
 
 void* HttpOpenSession(const wchar_t* userAgent)
 {
 	std::wstring proxy;
+	int mode = 1;
 	{
 		std::lock_guard<std::mutex> lk(g_proxyMx);
 		proxy = g_manualProxy;
+		mode = g_proxyMode;
 	}
-	if (!proxy.empty()) {
+	if (mode == 0) {
+		return WinHttpOpen(userAgent, WINHTTP_ACCESS_TYPE_NO_PROXY,
+			WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+	}
+	if (mode == 2 && !proxy.empty()) {
 		HINTERNET s = WinHttpOpen(userAgent, WINHTTP_ACCESS_TYPE_NAMED_PROXY,
 			proxy.c_str(), WINHTTP_NO_PROXY_BYPASS, 0);
 		if (s) return s;

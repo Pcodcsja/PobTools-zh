@@ -1104,6 +1104,12 @@ LauncherResult ShowLauncher(LauncherConfig& cfg, InstallInfo& installs, const st
 	auto startImport = [&](const std::wstring& from) {
 		importJob = std::async(std::launch::async, [from, exeDir]() { return ImportBuildsFromTool(from, exeDir); });
 	};
+	auto startPobImport = [&](const std::wstring& from) {
+		const std::wstring destination = cfg.buildPath;
+		importJob = std::async(std::launch::async, [from, exeDir, destination]() {
+			return ImportBuildsFromPobFolder(from, exeDir, destination);
+		});
+	};
 	// Test aids for the off-screen screenshot (no input is ever sent to the window):
 	// POBTOOLS_LAUNCHER_DL=poe1|poe2 starts that download, POBTOOLS_LAUNCHER_IMPORT=<dir> that import.
 	{
@@ -1332,6 +1338,15 @@ LauncherResult ShowLauncher(LauncherConfig& cfg, InstallInfo& installs, const st
 	bool launch = false;
 	bool openEditor = false;
 	bool applyUpdate = false;
+	// First-run setup is kept in the launcher so it can configure the same ini
+	// and protocol registration used by the existing settings pages.
+	bool wizardOpen = !cfg.firstRunCompleted;
+	int wizardPage = 0;
+	std::string wizardImportStatus;
+	bool wizardUsedOtherPob = false;
+	std::wstring wizardBuildPath = cfg.buildPath;
+	int wizardProxyMode = cfg.proxyMode;
+	std::string wizardProxyEdit = narrow(cfg.proxy);
 
 	// Has the user started anything in this launcher session? It gates the
 	// automatic update: closing and reopening the launcher is free while nothing
@@ -1376,6 +1391,10 @@ LauncherResult ShowLauncher(LauncherConfig& cfg, InstallInfo& installs, const st
 		syncCfgFromUi();
 		cfg.game = poe2 ? L"poe2" : L"poe1"; // the row that was clicked, not the selection
 		SaveLauncherConfigKeepModern(exeDir + L"pob-zh.ini", cfg);   // the child's safety net
+		if (!cfg.buildPath.empty()) {
+			const std::wstring pobDir = poe2 ? installs.poe2Dir : installs.poe1Dir;
+			if (!pobDir.empty()) SetPobBuildDir(pobDir, cfg.buildPath);
+		}
 		// Only a validated external folder is passed on (see the settings page),
 		// and only the one for the game being started; a broken path leaves POB on
 		// the built-in dictionaries.
@@ -2050,6 +2069,227 @@ LauncherResult ShowLauncher(LauncherConfig& cfg, InstallInfo& installs, const st
 			}
 			return open;
 		};
+
+		// First-run setup. This modal deliberately uses the launcher's existing
+		// controls and writes the same configuration keys as Settings, so a user
+		// can finish setup before a POB process is created.
+		if (wizardOpen) ImGui::OpenPopup("##firstRunWizard");
+		if (ImGui::BeginPopupModal("##firstRunWizard", nullptr,
+		                          ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+			const bool simplified = cfg.locale == L"zh-rCN";
+			auto wt = [&](const char* tw, const char* cn) { return simplified ? cn : tw; };
+			ImGui::TextUnformatted(wt("第一次使用 PobTools", "首次使用 PobTools"));
+			ImGui::TextWrapped("%s", wt("完成幾個選項後即可開始使用。之後可在設定中修改。",
+			                            "完成几个选项后即可开始使用。之后可在设置中修改。"));
+			ImGui::Separator();
+			const char* steps[] = { wt("語言", "语言"), wt("外觀", "外观"), wt("連結", "链接"), wt("網路", "网络"), wt("匯入", "导入") };
+			for (int i = 0; i < 5; i++) {
+				if (i) ImGui::SameLine();
+				ImGui::PushStyleColor(ImGuiCol_Text, i == wizardPage ? Tok::AccentText : Tok::TextMuted);
+				ImGui::Text("%d. %s", i + 1, steps[i]);
+				ImGui::PopStyleColor();
+			}
+			ImGui::Dummy(ImVec2(0, D(8.0f)));
+
+			if (wizardPage == 0) {
+				ImGui::TextUnformatted(wt("介面語言", "界面语言"));
+				// The installed locale list owns the IDs. Keep labels for unknown
+				// locales in stable storage rather than passing temporary strings.
+				std::vector<std::string> owned;
+				owned.reserve(locales.size());
+				std::vector<const char*> labels;
+				for (const LocaleInfo& l : locales) {
+					owned.push_back(l.id == "zh-rCN" ? "简体中文" : l.id == "zh-rTW" ? "繁體中文" : l.id);
+					labels.push_back(owned.back().c_str());
+				}
+				if (!labels.empty() && PobUi::Select("##wizardLocale", &localeIdx, labels.data(), nullptr,
+				                                  (int)labels.size(), D(230.0f))) {
+					syncCfgFromUi();
+					if (locales[localeIdx].id == "zh-rCN") {
+						for (const std::wstring& f : fontList) {
+							if (_wcsicmp(f.c_str(), L"MiSans-Regular.ttf") == 0) {
+								cfg.fontFile = f;
+								fontChanged = true;
+								break;
+							}
+						}
+						saveNow();
+					}
+				}
+				ImGui::TextWrapped("%s", wt("語言會套用到啟動器與新介面。", "语言会应用到启动器和新界面。"));
+			} else if (wizardPage == 1) {
+				ImGui::TextUnformatted(wt("字體與介面主題", "字体与界面主题"));
+				std::vector<std::string> fontOwned;
+				std::vector<const char*> fontLabels;
+				fontOwned.reserve(fontList.size() + 1);
+				int fontSel = 0;
+				fontOwned.push_back(wt("跟隨啟動器", "跟随启动器"));
+				fontLabels.push_back(fontOwned.back().c_str());
+				for (size_t i = 0; i < fontList.size(); i++) {
+					fontOwned.push_back(narrow(fontList[i]));
+					fontLabels.push_back(fontOwned.back().c_str());
+					if (_wcsicmp(cfg.fontFile.c_str(), fontList[i].c_str()) == 0) fontSel = (int)i + 1;
+				}
+				if (PobUi::Select("##wizardFont", &fontSel, fontLabels.data(), nullptr,
+				                 (int)fontLabels.size(), D(300.0f)))
+				{
+					cfg.fontFile = fontSel == 0 ? kDefaultFontFile : fontList[(size_t)fontSel - 1];
+					fontChanged = true;
+					saveNow();
+				}
+				ImGui::TextUnformatted(wt("字體預覽", "字体预览"));
+				ImGui::Text("%s", wt("天賦樹 詞綴 Passive Tree 1,234.5%", "天赋树 词缀 Passive Tree 1,234.5%"));
+				ImGui::TextDisabled("%s", wt("選擇後會立即重建啟動器字體。", "选择后会立即重建启动器字体。"));
+				std::string uiLabelOwned[3] = { wt("經典啟動器", "经典启动器"), wt("新介面 1", "新界面 1"), wt("新介面 2", "新界面 2") };
+				const char* uiLabels[] = { uiLabelOwned[0].c_str(), uiLabelOwned[1].c_str(), uiLabelOwned[2].c_str() };
+				int uiSel = cfg.uiMode;
+				ImGui::TextUnformatted(wt("啟動介面", "启动界面"));
+				if (PobUi::Select("##wizardUi", &uiSel, uiLabels, nullptr, 3, D(300.0f))) {
+					cfg.uiMode = uiSel;
+					SaveLauncherConfig(exeDir + L"pob-zh.ini", cfg);
+				}
+				if (cfg.uiMode == 0) {
+					ImGui::TextDisabled("%s", wt("主題只套用到新介面。請先在下方選擇新介面。",
+					                            "主题只应用到新界面。请先在下方选择新界面。"));
+				} else {
+					static const char* themeLabels[] = { "Slate", "Light", "Contrast", "Parchment" };
+					int themeSel = cfg.modernTheme == L"light" ? 1 : cfg.modernTheme == L"contrast" ? 2 : cfg.modernTheme == L"parchment" ? 3 : 0;
+					ImGui::TextUnformatted(wt("主題", "主题"));
+					if (PobUi::Select("##wizardTheme", &themeSel, themeLabels, nullptr, 4, D(300.0f))) {
+						cfg.modernTheme = themeSel == 1 ? L"light" : themeSel == 2 ? L"contrast" : themeSel == 3 ? L"parchment" : L"slate";
+						SaveLauncherConfig(exeDir + L"pob-zh.ini", cfg);
+					}
+					const ImVec4 themeSwatches[] = {
+						ImVec4(0.055f, 0.067f, 0.086f, 1.0f),
+						ImVec4(0.957f, 0.945f, 0.918f, 1.0f),
+						ImVec4(0.0f, 0.0f, 0.0f, 1.0f),
+						ImVec4(0.102f, 0.078f, 0.055f, 1.0f),
+					};
+					ImGui::TextUnformatted(wt("主題預覽（僅新介面）", "主题预览（仅新界面）"));
+					for (int i = 0; i < 4; i++) {
+						if (i) ImGui::SameLine(0, D(8.0f));
+						ImGui::PushID(i);
+						if (ImGui::ColorButton("##themeSwatch", themeSwatches[i], ImGuiColorEditFlags_NoTooltip,
+						                      ImVec2(D(48.0f), D(26.0f)))) {
+							cfg.modernTheme = i == 1 ? L"light" : i == 2 ? L"contrast" : i == 3 ? L"parchment" : L"slate";
+							SaveLauncherConfig(exeDir + L"pob-zh.ini", cfg);
+						}
+						ImGui::PopID();
+					}
+				}
+			} else if (wizardPage == 2) {
+				ImGui::TextUnformatted(wt("外部連結", "外部链接"));
+				ImGui::TextWrapped("%s", wt("開啟後，pobb.in、poe.ninja 等網站的「Open in PoB」連結會交給 PobTools 匯入。",
+				                            "开启后，pobb.in、poe.ninja 等网站的“Open in PoB”链接会交给 PobTools 导入。"));
+				bool protocol = cfg.pobProtocol;
+				if (ImGui::Checkbox(wt("啟用 Open in PoB 連結", "启用 Open in PoB 链接"), &protocol)) cfg.pobProtocol = protocol;
+				ImGui::TextWrapped("%s", wt("之後可在設定 → 連結中重新變更。", "之后可在设置 → 链接中重新更改。"));
+			} else if (wizardPage == 3) {
+				ImGui::TextUnformatted(wt("GitHub 鏡像與代理", "GitHub 镜像与代理"));
+				std::string proxyLabelOwned[3] = { wt("直連", "直连"), wt("系統代理", "系统代理"), wt("手動代理", "手动代理") };
+				const char* proxyLabels[] = { proxyLabelOwned[0].c_str(), proxyLabelOwned[1].c_str(), proxyLabelOwned[2].c_str() };
+				int proxyMode = wizardProxyMode;
+				if (PobUi::Select("##wizardProxyMode", &proxyMode, proxyLabels, nullptr, 3, D(300.0f))) {
+					wizardProxyMode = proxyMode;
+					cfg.proxyMode = proxyMode;
+					if (proxyMode != 2) {
+						cfg.proxy.clear();
+						wizardProxyEdit.clear();
+					}
+					HttpSetProxyMode(cfg.proxyMode, cfg.proxy);
+					cfg.githubMirror = proxyMode == 0;
+					HttpSetGitHubMirror(cfg.githubMirror, cfg.githubMirrorStation);
+					saveNow();
+				}
+				if (wizardProxyMode == 2) {
+					ImGui::SetNextItemWidth(D(300.0f));
+					if (ImGui::InputTextWithHint("##wizardProxy", "host:port", &wizardProxyEdit, ImGuiInputTextFlags_EnterReturnsTrue) ||
+					    ImGui::IsItemDeactivatedAfterEdit()) {
+						cfg.proxy = widen(wizardProxyEdit);
+						HttpSetProxyMode(2, cfg.proxy);
+						cfg.githubMirror = false;
+						HttpSetGitHubMirror(false, cfg.githubMirrorStation);
+						saveNow();
+					}
+				}
+				ImGui::TextWrapped("%s", wt("直連時預設開啟 GitHub 鏡像。系統代理或手動代理會自動關閉鏡像，避免重複轉發。",
+				                            "直连时默认开启 GitHub 镜像。系统代理或手动代理会自动关闭镜像，避免重复转发。"));
+				std::string stationNames[3] = { wt("自動", "自动"), "gh-proxy.com", "gh-proxy.org" };
+				const char* stationOptions[] = { stationNames[0].c_str(), stationNames[1].c_str(), stationNames[2].c_str() };
+				int station = cfg.githubMirrorStation;
+				if (PobUi::Select("##wizardMirrorStation", &station, stationOptions, nullptr, 3, D(220.0f), cfg.proxyMode == 0)) {
+					cfg.githubMirrorStation = station;
+					cfg.githubMirror = true;
+					HttpSetGitHubMirror(true, station);
+					saveNow();
+				}
+				bool mirror = cfg.githubMirror;
+				if (PobUi::Switch("##wizardMirror", &mirror, cfg.proxyMode == 0)) {
+					cfg.githubMirror = mirror;
+					HttpSetGitHubMirror(mirror, cfg.githubMirrorStation);
+					saveNow();
+				}
+				ImGui::SameLine(0, D(8.0f));
+				ImGui::TextUnformatted(wt("啟用 GitHub 鏡像", "启用 GitHub 镜像"));
+			} else {
+				ImGui::TextUnformatted(wt("之前用過其他 PoB 嗎？", "之前用过其他 PoB 吗？"));
+				const char* usedOptions[] = { wt("否，沒有用過", "否，没用过"), wt("是，用過", "是，用过") };
+				int used = wizardUsedOtherPob ? 1 : 0;
+				if (PobUi::Segmented("##wizardUsedPob", &used, usedOptions, 2)) wizardUsedOtherPob = used == 1;
+				if (wizardUsedOtherPob) {
+					ImGui::TextWrapped("%s", wt("請選擇之前的 PoB 資料夾，PobTools 會自動讀取其中的 Builds 檔案。",
+					                            "请选择之前的 PoB 文件夹，PobTools 会自动读取其中的 Builds 文件。"));
+					if (PobUi::Button(wt("選擇之前的 PoB 資料夾", "选择之前的 PoB 文件夹"), PobUi::BtnKind::Secondary, PobUi::BtnSize::Md)) {
+						const wchar_t* importTitle = simplified ? L"选择之前的 PoB 文件夹" : L"選擇之前的 PoB 資料夾";
+						const std::wstring picked = EdBrowseForFolder(importTitle);
+						if (!picked.empty() && !importJob.valid()) {
+							startPobImport(picked);
+							wizardImportStatus = wt("已開始讀取舊版 Builds。", "已开始读取旧版 Builds。");
+						}
+					}
+				} else {
+					ImGui::TextWrapped("%s", wt("你可以直接使用預設 Builds 資料夾，或選擇新的存儲位置。",
+					                            "你可以直接使用默认 Builds 文件夹，或选择新的存储位置。"));
+					if (PobUi::Button(wt("默認位置", "默认位置"), PobUi::BtnKind::Ghost, PobUi::BtnSize::Md)) {
+						wizardBuildPath.clear();
+						cfg.buildPath.clear();
+						saveNow();
+					}
+					ImGui::SameLine(0, D(8.0f));
+					if (PobUi::Button(wt("自定義位置", "自定义位置"), PobUi::BtnKind::Secondary, PobUi::BtnSize::Md)) {
+						const wchar_t* buildTitle = simplified ? L"选择 Builds 存储位置" : L"選擇 Builds 儲存位置";
+						const std::wstring picked = EdBrowseForFolder(buildTitle);
+						if (!picked.empty()) {
+							wizardBuildPath = picked;
+							cfg.buildPath = picked;
+							saveNow();
+						}
+					}
+					if (!wizardBuildPath.empty()) {
+						ImGui::TextWrapped("%s: %s", wt("目前位置", "当前位置"), narrow(wizardBuildPath).c_str());
+					}
+				}
+				if (!wizardImportStatus.empty()) ImGui::TextWrapped("%s", wizardImportStatus.c_str());
+			}
+
+			ImGui::Dummy(ImVec2(0, D(10.0f)));
+			if (wizardPage > 0) {
+				if (PobUi::Button(wt("上一步", "上一步"), PobUi::BtnKind::Ghost, PobUi::BtnSize::Sm)) --wizardPage;
+				ImGui::SameLine();
+			}
+			if (wizardPage < 4) {
+				if (PobUi::Button(wt("下一步", "下一步"), PobUi::BtnKind::Primary, PobUi::BtnSize::Sm)) ++wizardPage;
+			} else {
+				if (PobUi::Button(wt("完成設定", "完成设置"), PobUi::BtnKind::Primary, PobUi::BtnSize::Sm)) {
+					syncCfgFromUi();
+					cfg.firstRunCompleted = true;
+					SaveLauncherConfigKeepModern(exeDir + L"pob-zh.ini", cfg);
+					wizardOpen = false;
+					ImGui::CloseCurrentPopup();
+				}
+			}
+			ImGui::EndPopup();
+		}
 
 		// ---- header ----------------------------------------------------------
 		// Logo, product name, the version line and the update state. Drawn above
@@ -3107,8 +3347,9 @@ LauncherResult ShowLauncher(LauncherConfig& cfg, InstallInfo& installs, const st
 				if (mirrorProbe.valid() && mirrorProbe.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
 					mirrorTimings = mirrorProbe.get();
 				auto applyMirror = [&]() {
+					if (cfg.proxyMode != 0) cfg.githubMirror = false;
 					saveNow();
-					HttpSetGitHubMirror(cfg.githubMirror, cfg.githubMirrorStation);
+					HttpSetGitHubMirror(cfg.proxyMode == 0 && cfg.githubMirror, cfg.githubMirrorStation);
 				};
 				PobUi::RowBegin(S.githubMirrorLabel, S.githubMirrorHint, PobUi::SwitchWidth());
 				if (PobUi::Switch("##githubmirror", &cfg.githubMirror)) applyMirror();
@@ -3203,8 +3444,11 @@ LauncherResult ShowLauncher(LauncherConfig& cfg, InstallInfo& installs, const st
 					std::wstring w = widen(v);
 					if (w == cfg.proxy) return;
 					cfg.proxy = w;
+					cfg.proxyMode = w.empty() ? 1 : 2;
+					cfg.githubMirror = false;
 					saveNow();
-					HttpSetManualProxy(cfg.proxy);
+					HttpSetProxyMode(cfg.proxyMode, cfg.proxy);
+					HttpSetGitHubMirror(false, cfg.githubMirrorStation);
 				};
 				const float fw = std::floor(D(240.0f));
 				PobUi::RowBegin(S.proxyLabel, S.proxyHintShort, fw);

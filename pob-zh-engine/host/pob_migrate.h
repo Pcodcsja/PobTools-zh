@@ -49,6 +49,17 @@ struct BuildImportResult {
 // Trailing backslash on either argument is optional.
 BuildImportResult ImportBuildsFromTool(const std::wstring& srcToolDir, const std::wstring& ourExeDir);
 
+// Import directly from one previously installed Path of Building folder. This
+// is the first-run path when the user points at the old POB itself instead of
+// the old launcher's parent folder.
+BuildImportResult ImportBuildsFromPobFolder(const std::wstring& srcPobDir,
+                                            const std::wstring& ourExeDir,
+                                            const std::wstring& destinationBuildDir = std::wstring());
+
+// Update the POB Settings.xml buildPath attribute when the user selected a
+// custom Builds folder. An absent Settings.xml is left for POB to create.
+bool SetPobBuildDir(const std::wstring& pobDir, const std::wstring& buildDir);
+
 // ---- stock POB download ---------------------------------------------------
 
 // "PathOfBuildingCommunity-Portable" / "PathOfBuildingCommunity-PoE2-Portable":

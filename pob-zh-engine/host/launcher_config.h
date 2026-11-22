@@ -142,6 +142,9 @@ inline int ClampWindowDim(int v)
 }
 
 struct LauncherConfig {
+	// Set after the first-run setup wizard. Older installations with an existing
+	// ini file are considered already configured.
+	bool           firstRunCompleted = false;
 	std::wstring   game     = L"poe1";      // "poe1" | "poe2"
 	std::wstring   locale   = L"zh-rTW";    // "zh-rTW" | "en"
 	LaunchExitMode exitMode = LaunchExitMode::CloseLauncher;
@@ -187,6 +190,9 @@ struct LauncherConfig {
 	// Points at the folder that directly CONTAINS the <locale> sub-folders (a copy of Data\poe1);
 	// updates only write to the install directory, so that copy cannot be overwritten.
 	std::wstring   dataDir[kDictSlotCount];
+	// Optional shared Builds folder selected during first-run setup. Empty keeps
+	// Path of Building's own default or Settings.xml choice.
+	std::wstring   buildPath;
 	// Whether an update may replace the translation dictionaries. Off is for
 	// people editing translations themselves; see IsTranslationDataRel.
 	bool           updateTranslations = true;
@@ -197,8 +203,9 @@ struct LauncherConfig {
 	// Turning it off never downgrades (PlanUpdates only offers a HIGHER version).
 	// ⚠ The translation-data line is NOT forked: both channels share data-<n>.
 	bool           betaChannel = false;
-	// HTTP proxy for the launcher's own downloads, "host:port". Empty = follow the system proxy.
-	// Applied via HttpSetManualProxy (http_client.h).
+	// HTTP proxy policy. 0 = direct, 1 = system proxy, 2 = manual proxy.
+	// `proxy` carries the host:port value for mode 2.
+	int            proxyMode = 1;
 	std::wstring   proxy;
 	bool           githubMirror = false;
 	int            githubMirrorStation = 0; // 0 auto, 1 gh-proxy.com, 2 gh-proxy.org

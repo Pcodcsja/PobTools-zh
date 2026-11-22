@@ -354,10 +354,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int)
 	if (argvW) LocalFree(argvW);
 
 	// Proxy for every WinHTTP session, set before any dispatch (tool children re-enter here too).
-	// Empty follows the system proxy.
 	const auto networkCfg = LoadLauncherConfig(dir + L"pob-zh.ini");
-	HttpSetManualProxy(networkCfg.proxy);
-	HttpSetGitHubMirror(networkCfg.githubMirror, networkCfg.githubMirrorStation);
+	HttpSetProxyMode(networkCfg.proxyMode, networkCfg.proxy);
+	HttpSetGitHubMirror(networkCfg.proxyMode == 0 && networkCfg.githubMirror,
+	                    networkCfg.githubMirrorStation);
 	// The token is watched, not read once: a tool child must pick up the settings page saving/clearing it.
 	GitHubToken::Init(dir);
 
@@ -1005,6 +1005,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int)
 		}
 
 		apply_engine_env(cfg, dir, cfg.game);
+		if (!cfg.buildPath.empty()) {
+			const std::wstring pobDir = cfg.game == L"poe2" ? installs.poe2Dir : installs.poe1Dir;
+			if (!pobDir.empty()) SetPobBuildDir(pobDir, cfg.buildPath);
+		}
 		// Held for the whole run: the engine reads Data\*.json on a background thread, and the updater
 		// would otherwise write a new pack straight over them.
 		appUpdater.SetHold(true);

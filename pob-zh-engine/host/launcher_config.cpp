@@ -132,6 +132,8 @@ LauncherConfig LoadLauncherConfig(const std::wstring& iniPath)
 {
 	LauncherConfig c;
 	wchar_t buf[64];
+	const bool iniExists = GetFileAttributesW(iniPath.c_str()) != INVALID_FILE_ATTRIBUTES;
+	c.firstRunCompleted = read_ini_int(iniPath, L"FirstRunCompleted", iniExists ? 1 : 0) != 0;
 
 	// Environment variables (long-lived user setup) take priority as defaults;
 	// the UI's final choice overwrites them via set_env_both before launch.
@@ -242,6 +244,7 @@ LauncherConfig LoadLauncherConfig(const std::wstring& iniPath)
 		std::wstring decoded = utf8_of_hex(read_ini_path(iniPath, (key + L"Hex").c_str()));
 		c.dataDir[i] = decoded.empty() ? read_ini_path(iniPath, key.c_str()) : decoded;
 	}
+	c.buildPath = read_ini_path(iniPath, L"BuildPath");
 
 	c.updateTranslations = read_ini_int(iniPath, L"UpdateTranslations", 1) != 0;
 	// Default 0: never install a new version, close and reopen the program on a
@@ -259,7 +262,11 @@ LauncherConfig LoadLauncherConfig(const std::wstring& iniPath)
 	c.perfLog = read_ini_int(iniPath, L"PerfLog", 0) != 0;
 	c.pobProtocol = read_ini_int(iniPath, L"PobProtocol", 0) != 0;
 
+	const int defaultProxyMode = iniExists ? 1 : 0;
+	c.proxyMode = read_ini_int(iniPath, L"ProxyMode", defaultProxyMode);
+	if (c.proxyMode < 0 || c.proxyMode > 2) c.proxyMode = defaultProxyMode;
 	c.proxy = read_ini_path(iniPath, L"Proxy");
+	if (c.proxyMode == 2 && c.proxy.empty()) c.proxyMode = 1;
 	c.githubMirror = read_ini_int(iniPath, L"GitHubMirror", 0) != 0;
 	c.githubMirrorStation = read_ini_int(iniPath, L"GitHubMirrorStation", 0);
 	if (c.githubMirrorStation < 0 || c.githubMirrorStation > 2) c.githubMirrorStation = 0;
@@ -313,6 +320,8 @@ void SaveLauncherConfig(const std::wstring& iniPath, const LauncherConfig& cfg)
 		                            std::to_string((unsigned long)GetLastError()) +
 		                            " (settings will not survive a restart)");
 	}
+	WritePrivateProfileStringW(kSection, L"FirstRunCompleted",
+		cfg.firstRunCompleted ? L"1" : L"0", iniPath.c_str());
 	WritePrivateProfileStringW(kSection, L"Locale", cfg.locale.c_str(), iniPath.c_str());
 	WritePrivateProfileStringW(kSection, L"ExitMode",
 		std::to_wstring((int)cfg.exitMode).c_str(), iniPath.c_str());
@@ -412,6 +421,7 @@ void SaveLauncherConfig(const std::wstring& iniPath, const LauncherConfig& cfg)
 			WritePrivateProfileStringW(kSection, hexKey.c_str(), hex_of_utf8(cfg.dataDir[i]).c_str(),
 			                           iniPath.c_str());
 	}
+	WritePrivateProfileStringW(kSection, L"BuildPath", cfg.buildPath.c_str(), iniPath.c_str());
 	// The single shared DataDir shipped in no release; drop it rather than leave a
 	// dead key that looks like it still does something.
 	WritePrivateProfileStringW(kSection, L"DataDir", nullptr, iniPath.c_str());
@@ -425,6 +435,8 @@ void SaveLauncherConfig(const std::wstring& iniPath, const LauncherConfig& cfg)
 		cfg.betaChannel ? L"1" : L"0", iniPath.c_str());
 
 	WritePrivateProfileStringW(kSection, L"Proxy", cfg.proxy.c_str(), iniPath.c_str());
+	WritePrivateProfileStringW(kSection, L"ProxyMode",
+		std::to_wstring(cfg.proxyMode >= 0 && cfg.proxyMode <= 2 ? cfg.proxyMode : 1).c_str(), iniPath.c_str());
 	WritePrivateProfileStringW(kSection, L"GitHubMirror", cfg.githubMirror ? L"1" : L"0", iniPath.c_str());
 	WritePrivateProfileStringW(kSection, L"GitHubMirrorStation",
 		std::to_wstring(cfg.githubMirrorStation >= 0 && cfg.githubMirrorStation <= 2 ? cfg.githubMirrorStation : 0).c_str(), iniPath.c_str());

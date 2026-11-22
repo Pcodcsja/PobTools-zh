@@ -11,9 +11,12 @@
 #include <unordered_map>
 #include <vector>
 
-// Manual proxy for every host-side WinHTTP session ("host:port"; a pasted http:// prefix is tolerated). Empty =
-// follow the system proxy (also the fallback when the manual value cannot be applied). Set at startup from
-// pob-zh.ini and when the setting changes; sessions created afterwards pick it up.
+// Configure every host-side WinHTTP session. mode 0 is direct, mode 1 follows
+// the Windows system proxy, and mode 2 uses the supplied host:port value.
+void HttpSetProxyMode(int mode, const std::wstring& proxy);
+
+// Compatibility helper. Empty follows the system proxy, a value selects the
+// manual proxy mode.
 void HttpSetManualProxy(const std::wstring& proxy);
 
 // Separate from HTTP forward proxies: 0 auto, 1 gh-proxy.com, 2 gh-proxy.org.

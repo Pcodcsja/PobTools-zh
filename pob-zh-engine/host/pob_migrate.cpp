@@ -180,6 +180,58 @@ BuildImportResult ImportBuildsFromTool(const std::wstring& srcToolDir, const std
 	return r;
 }
 
+BuildImportResult ImportBuildsFromPobFolder(const std::wstring& srcPobDir,
+                                            const std::wstring& ourExeDir,
+                                            const std::wstring& destinationBuildDir)
+{
+	BuildImportResult r;
+	const std::wstring src = no_slash(srcPobDir);
+	if (!dir_exists(src)) return r;
+	const std::wstring srcBuilds = PobBuildDir(src);
+	if (!dir_exists(srcBuilds)) return r;
+	r.sourceFound = true;
+	const bool poe2 = PobDirIsPoe2(src);
+	std::wstring dst = no_slash(destinationBuildDir);
+	if (dst.empty()) {
+		const InstallInfo ours = DetectInstalls(with_slash(ourExeDir));
+		const std::wstring target = poe2 ? ours.poe2Dir : ours.poe1Dir;
+		if (!target.empty()) dst = PobBuildDir(target);
+	}
+	if (dst.empty()) {
+		if (poe2) r.needPoe2 = true;
+		else r.needPoe1 = true;
+		return r;
+	}
+	if (poe2) r.poe2 = ImportBuildTree(srcBuilds, dst);
+	else r.poe1 = ImportBuildTree(srcBuilds, dst);
+	return r;
+}
+
+bool SetPobBuildDir(const std::wstring& pobDir, const std::wstring& buildDir)
+{
+	const std::wstring base = no_slash(pobDir);
+	const std::wstring target = no_slash(buildDir);
+	if (base.empty() || target.empty() || !dir_exists(target)) return false;
+	std::string xml;
+	const std::wstring settings = base + L"\\Settings.xml";
+	if (!read_file_utf8(settings, xml)) return false;
+	const size_t misc = xml.find("<Misc");
+	if (misc == std::string::npos) return false;
+	const size_t end = xml.find('>', misc);
+	if (end == std::string::npos) return false;
+	const std::string value = narrow(target);
+	const std::string attr = " buildPath=\"" + value + "\"";
+	const size_t attrStart = xml.find(" buildPath=\"", misc);
+	if (attrStart != std::string::npos && attrStart < end) {
+		const size_t attrEnd = xml.find('"', attrStart + 12);
+		if (attrEnd == std::string::npos || attrEnd > end) return false;
+		xml.replace(attrStart, attrEnd + 1 - attrStart, attr);
+	} else {
+		xml.insert(end, attr);
+	}
+	return write_file_utf8(settings, xml);
+}
+
 const wchar_t* PobPortableDirName(bool poe2)
 {
 	return poe2 ? L"PathOfBuildingCommunity-PoE2-Portable" : L"PathOfBuildingCommunity-Portable";
