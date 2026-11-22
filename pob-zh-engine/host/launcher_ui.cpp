@@ -1347,6 +1347,7 @@ LauncherResult ShowLauncher(LauncherConfig& cfg, InstallInfo& installs, const st
 	std::wstring wizardBuildPath = cfg.buildPath;
 	int wizardProxyMode = cfg.proxyMode;
 	std::string wizardProxyEdit = narrow(cfg.proxy);
+	bool wizardProxyInitialized = false;
 
 	// Has the user started anything in this launcher session? It gates the
 	// automatic update: closing and reopening the launcher is free while nothing
@@ -2165,7 +2166,44 @@ LauncherResult ShowLauncher(LauncherConfig& cfg, InstallInfo& installs, const st
 						ImVec4(0.0f, 0.0f, 0.0f, 1.0f),
 						ImVec4(0.102f, 0.078f, 0.055f, 1.0f),
 					};
+					const ImVec4 themePanels[] = {
+						ImVec4(0.098f, 0.125f, 0.161f, 1.0f),
+						ImVec4(0.894f, 0.875f, 0.831f, 1.0f),
+						ImVec4(0.106f, 0.106f, 0.106f, 1.0f),
+						ImVec4(0.165f, 0.129f, 0.090f, 1.0f),
+					};
+					const ImVec4 themeText[] = {
+						ImVec4(0.925f, 0.902f, 0.847f, 1.0f),
+						ImVec4(0.110f, 0.118f, 0.137f, 1.0f),
+						ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
+						ImVec4(0.937f, 0.886f, 0.769f, 1.0f),
+					};
+					const ImVec4 themeAccent[] = {
+						ImVec4(0.847f, 0.667f, 0.294f, 1.0f),
+						ImVec4(0.580f, 0.396f, 0.063f, 1.0f),
+						ImVec4(1.0f, 0.784f, 0.239f, 1.0f),
+						ImVec4(0.878f, 0.663f, 0.290f, 1.0f),
+					};
 					ImGui::TextUnformatted(wt("主題預覽（僅新介面）", "主题预览（仅新界面）"));
+					const ImVec4& previewBg = themeSwatches[themeSel];
+					const ImVec4& previewPanel = themePanels[themeSel];
+					const ImVec4& previewText = themeText[themeSel];
+					const ImVec4& previewAccent = themeAccent[themeSel];
+					ImGui::PushStyleColor(ImGuiCol_ChildBg, previewBg);
+					ImGui::BeginChild("##wizardThemePreview", ImVec2(0, D(62.0f)), true,
+					                  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+					ImGui::PushStyleColor(ImGuiCol_ChildBg, previewPanel);
+					ImGui::BeginChild("##wizardThemePreviewPanel", ImVec2(-D(8.0f), D(40.0f)), true,
+					                  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+					ImGui::PushStyleColor(ImGuiCol_Text, previewText);
+					ImGui::TextUnformatted(wt("主题预览", "主题预览"));
+					ImGui::SameLine();
+					ImGui::TextColored(previewAccent, "%s", wt("选中主题", "选中主题"));
+					ImGui::PopStyleColor();
+					ImGui::EndChild();
+					ImGui::PopStyleColor();
+					ImGui::EndChild();
+					ImGui::PopStyleColor();
 					for (int i = 0; i < 4; i++) {
 						if (i) ImGui::SameLine(0, D(8.0f));
 						ImGui::PushID(i);
@@ -2173,6 +2211,11 @@ LauncherResult ShowLauncher(LauncherConfig& cfg, InstallInfo& installs, const st
 						                      ImVec2(D(48.0f), D(26.0f)))) {
 							cfg.modernTheme = i == 1 ? L"light" : i == 2 ? L"contrast" : i == 3 ? L"parchment" : L"slate";
 							SaveLauncherConfig(exeDir + L"pob-zh.ini", cfg);
+						}
+						if (i == themeSel) {
+							const ImVec2 min = ImGui::GetItemRectMin();
+							const ImVec2 max = ImGui::GetItemRectMax();
+							ImGui::GetWindowDrawList()->AddRect(min, max, ImGui::GetColorU32(previewAccent), D(2.0f), 0, D(2.0f));
 						}
 						ImGui::PopID();
 					}
@@ -2185,6 +2228,18 @@ LauncherResult ShowLauncher(LauncherConfig& cfg, InstallInfo& installs, const st
 				if (ImGui::Checkbox(wt("啟用 Open in PoB 連結", "启用 Open in PoB 链接"), &protocol)) cfg.pobProtocol = protocol;
 				ImGui::TextWrapped("%s", wt("之後可在設定 → 連結中重新變更。", "之后可在设置 → 链接中重新更改。"));
 			} else if (wizardPage == 3) {
+				if (!wizardProxyInitialized) {
+					wizardProxyInitialized = true;
+					if (wizardProxyMode == 0 && !cfg.githubMirror) {
+						cfg.githubMirror = true;
+						HttpSetGitHubMirror(true, cfg.githubMirrorStation);
+						saveNow();
+					} else if (wizardProxyMode != 0 && cfg.githubMirror) {
+						cfg.githubMirror = false;
+						HttpSetGitHubMirror(false, cfg.githubMirrorStation);
+						saveNow();
+					}
+				}
 				ImGui::TextUnformatted(wt("GitHub 鏡像與代理", "GitHub 镜像与代理"));
 				std::string proxyLabelOwned[3] = { wt("直連", "直连"), wt("系統代理", "系统代理"), wt("手動代理", "手动代理") };
 				const char* proxyLabels[] = { proxyLabelOwned[0].c_str(), proxyLabelOwned[1].c_str(), proxyLabelOwned[2].c_str() };
