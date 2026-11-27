@@ -23,6 +23,7 @@ struct Options {
 	std::wstring game;        // "poe1" / "poe2" -> POB_GAME
 	std::wstring locale;      // -> POB_LOCALE ("" = no translation)
 	bool hangWatch = false;   // the watchdog's window gate never opens headless; off by default
+	bool poe1ChinaTrade = false;
 };
 
 class Child {

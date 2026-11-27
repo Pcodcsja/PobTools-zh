@@ -324,6 +324,8 @@ export interface CompareConfigRows {
 /** POB's price-builder pane (TradeQuery:PriceItem). */
 export interface TradeState {
   authenticated: boolean;
+  chinaTrade?: boolean;
+  chinaLeague?: string;
   authLabel?: string;
   realm?: TjField;
   league?: TjField;
@@ -406,6 +408,7 @@ export interface TjField {
 }
 /** TreeTab's "Find a Timeless Jewel" as the bridge drives it. */
 export interface TimelessState {
+  chinaTrade?: boolean;
   jewel?: TjField;
   conqueror?: TjField;
   socket?: TjField;
@@ -1349,6 +1352,7 @@ export const api = {
   tjSet: (p: Record<string, unknown>) => bridge.call<TimelessState>("tj_set", p, 120000),
   tjSearch: () => bridge.call<TimelessState>("tj_search", {}, 900000),
   tjResult: (index: number, action?: "socket") => bridge.call<{ raw: string; ok?: boolean }>("tj_result", { index, action }, 120000),
+  tjTrade: (index: number) => bridge.call<{ url: string }>("tj_trade", { index }),
   tjClose: () => bridge.call<{ ok: boolean }>("tj_close", {}, 30000),
   treeClick: (id: number, extra: { effect?: number; confirm?: "reset" | "connect"; attribute?: number; trace?: number[] } = {}) =>
     bridge.call<TreeClickResult>("tree_click", { id, ...extra }, 60000),

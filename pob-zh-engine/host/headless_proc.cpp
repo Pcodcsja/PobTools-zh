@@ -155,6 +155,7 @@ bool Child::Start(const Options& opt, std::string& error)
 	set_env_both(L"POB_GAME", opt.game.c_str());
 	set_env_both(L"POB_LOCALE", opt.locale.c_str());
 	set_env_both(L"POB_ZH_HANGWATCH", opt.hangWatch ? L"1" : L"0");
+	set_env_both(L"POB_ZH_CN_TRADE", opt.game == L"poe1" && opt.poe1ChinaTrade ? L"1" : L"0");
 
 	std::wstring exe = exe_path();
 	std::wstring cmd = L"\"" + exe + L"\" --engine-headless \"" + opt.launchLua + L"\"";
@@ -177,6 +178,7 @@ bool Child::Start(const Options& opt, std::string& error)
 	// POB started from the same launcher must not come up headless.
 	set_env_both(L"POB_ZH_HEADLESS", L"");
 	set_env_both(L"POB_ZH_BRIDGE", L"");
+	set_env_both(L"POB_ZH_CN_TRADE", L"");
 	if (!ok) {
 		error = "CreateProcess failed, GetLastError=" + std::to_string(GetLastError());
 		PobLog::Error("headless", error);

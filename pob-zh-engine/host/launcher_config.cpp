@@ -261,6 +261,7 @@ LauncherConfig LoadLauncherConfig(const std::wstring& iniPath)
 
 	c.proxy = read_ini_path(iniPath, L"Proxy");
 	c.githubMirror = read_ini_int(iniPath, L"GitHubMirror", 0) != 0;
+	c.poe1ChinaTrade = read_ini_int(iniPath, L"Poe1ChinaTrade", 0) != 0;
 	c.githubMirrorStation = read_ini_int(iniPath, L"GitHubMirrorStation", 0);
 	if (c.githubMirrorStation < 0 || c.githubMirrorStation > 2) c.githubMirrorStation = 0;
 
@@ -426,6 +427,7 @@ void SaveLauncherConfig(const std::wstring& iniPath, const LauncherConfig& cfg)
 
 	WritePrivateProfileStringW(kSection, L"Proxy", cfg.proxy.c_str(), iniPath.c_str());
 	WritePrivateProfileStringW(kSection, L"GitHubMirror", cfg.githubMirror ? L"1" : L"0", iniPath.c_str());
+	WritePrivateProfileStringW(kSection, L"Poe1ChinaTrade", cfg.poe1ChinaTrade ? L"1" : L"0", iniPath.c_str());
 	WritePrivateProfileStringW(kSection, L"GitHubMirrorStation",
 		std::to_wstring(cfg.githubMirrorStation >= 0 && cfg.githubMirrorStation <= 2 ? cfg.githubMirrorStation : 0).c_str(), iniPath.c_str());
 }
@@ -1597,13 +1599,16 @@ int RunLauncherConfigSelfTest(const std::wstring& exeDir)
 	check("T17d Proxy defaults to empty", LoadLauncherConfig(ini).proxy.empty());
 	check("GitHub mirrors default off with automatic selection", !LoadLauncherConfig(ini).githubMirror &&
 	      LoadLauncherConfig(ini).githubMirrorStation == 0);
+	check("Mainland China trade defaults off", !LoadLauncherConfig(ini).poe1ChinaTrade);
 	{
 		LauncherConfig c;
 		c.githubMirror = true;
 		c.githubMirrorStation = 2;
+		c.poe1ChinaTrade = true;
 		SaveLauncherConfig(ini, c);
 		const auto r = LoadLauncherConfig(ini);
 		check("GitHub mirror toggle and station round-trip", r.githubMirror && r.githubMirrorStation == 2);
+		check("Mainland China trade selection round-trips", r.poe1ChinaTrade);
 		write(L"PobTools", { { L"GitHubMirrorStation", L"999" } });
 		check("Unknown GitHub mirror station falls back to auto", LoadLauncherConfig(ini).githubMirrorStation == 0);
 	}

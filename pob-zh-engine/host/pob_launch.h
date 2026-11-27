@@ -45,7 +45,7 @@ void SetEngineEnv(const std::wstring& game, const std::wstring& locale,
                   const std::wstring& bgPath = std::wstring(), int bgBright = 50,
                   int glassBlur = 0, int treeBg = 100, bool hangWatch = true,
                   int fpsForeground = 60, int fpsBackground = 15, bool perfLog = false,
-                  const std::wstring& dictSwitches = std::wstring());
+                  const std::wstring& dictSwitches = std::wstring(), bool poe1ChinaTrade = false);
 
 // Live counterparts for the background image (absolute path, "" = none), its
 // brightness and the liquid-glass blur; same delivery as ApplyPobWindowOpacity

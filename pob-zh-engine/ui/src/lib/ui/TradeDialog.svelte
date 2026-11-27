@@ -53,7 +53,7 @@
     await run(() => api.tradeOpen());
     poll = setInterval(async () => {
       if (!st || busy !== null) return;
-      if ((st.league?.options.length ?? 0) > 0) {
+      if (st.chinaTrade ? st.chinaLeague : (st.league?.options.length ?? 0) > 0) {
         clearInterval(poll);
         poll = undefined;
         return;
@@ -246,7 +246,9 @@
   <div class="dialog">
     <div class="top">
       <span class="label">{t("trade.title")}</span>
-      {#if st}
+      {#if st?.chinaTrade}
+        <span class="dim">{t("trade.china")}{st.chinaLeague ? " · " + st.chinaLeague : ""}</span>
+      {:else if st}
         <span class="dim">{st.authLabel ?? ""}</span>
         <button class="btn sm" disabled={busy !== null} onclick={() => run(() => api.tradeAuth())}>{st.authenticated ? t("trade.logout") : t("trade.login")}</button>
       {/if}
@@ -256,8 +258,9 @@
     </div>
     {#if err}<p class="bad">{err}</p>{/if}
     {#if st}
-      <p class="dim small">{t("trade.hint")}</p>
+      <p class="dim small">{t(st.chinaTrade ? "trade.chinaHint" : "trade.hint")}</p>
       <div class="bar">
+        {#if !st.chinaTrade}
         <span class="k">{t("trade.realm")}</span>
         <Select class="select sm" value={st.realm?.sel} disabled={busy !== null} options={opts1(st.realm?.options)} onchange={(v) => set({ realm: Number(v) })} />
         <span class="k">{t("trade.league")}</span>
@@ -266,9 +269,10 @@
         <Select class="select sm" value={st.tradeType?.sel} disabled={busy !== null} options={opts1(st.tradeType?.options)} onchange={(v) => set({ tradeType: Number(v) })} />
         <span class="k">{t("trade.sort")}</span>
         <Select class="select sm" value={st.sort?.sel} disabled={busy !== null} options={opts1(st.sort?.options)} onchange={(v) => set({ sort: Number(v) })} />
-        <button class="btn sm" disabled={busy !== null} onclick={openWeights}>{t("trade.weights")}</button>
         <span class="k">{t("trade.pages")}</span>
         <input class="input sm num pages" value={st.fetchPages ?? ""} disabled={busy !== null} onchange={(e) => set({ fetchPages: Number(e.currentTarget.value) })} />
+        {/if}
+        <button class="btn sm" disabled={busy !== null} onclick={openWeights}>{t("trade.weights")}</button>
       </div>
       {#if st.notice}<p class="notice">{st.notice}</p>{/if}
       {#if st.timedOut}<p class="notice">{t("trade.stillRunning")}</p>{/if}
@@ -278,8 +282,10 @@
             <span class="slot" class:unique={r.unique}>{r.nameZh || r.name}</span>
             <button class="btn sm" disabled={busy !== null || !r.canFindBest} title={t("trade.findBestHint")} onclick={() => findBest(r.index)}>{t("trade.findBest")}</button>
             <input class="input sm url" placeholder={t("trade.urlHint")} bind:value={urls[r.index]} onchange={() => set({ url: { row: r.index, text: urls[r.index] } }, r.index)} />
-            <button class="btn ghost sm" disabled={!urls[r.index]} title={t("trade.openUrl")} onclick={() => openUrl(urls[r.index])}>↗</button>
-            <button class="btn sm" disabled={busy !== null || !r.canPrice} onclick={() => run(() => api.tradePrice(r.index), r.index)}>{t("trade.price")}</button>
+            <button class="btn ghost sm" disabled={!urls[r.index] || (st.chinaTrade && !r.validUrl)} title={t("trade.openUrl")} onclick={() => openUrl(urls[r.index])}>↗</button>
+            {#if !st.chinaTrade}
+              <button class="btn sm" disabled={busy !== null || !r.canPrice} onclick={() => run(() => api.tradePrice(r.index), r.index)}>{t("trade.price")}</button>
+            {/if}
             {#if r.hasResults}
               <div class="results">
                 <button

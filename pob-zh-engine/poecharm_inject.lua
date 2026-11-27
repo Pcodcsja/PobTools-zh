@@ -1249,6 +1249,70 @@ end
 -- ===== per-class patchers =====
 local PATCHES = {}
 
+if gameRules.installChinaTrade then
+	local ok, err = pcall(gameRules.installChinaTrade)
+	if not ok then log("PoE1 China trade: " .. tostring(err)) end
+end
+
+if PobToolsCnTrade then
+	local market = PobToolsCnTrade
+	PATCHES["TradeQueryGenerator"] = function(class)
+		local request = class.RequestQuery
+		if type(request) ~= "function" then return end
+		class.RequestQuery = keepArity(request, function(self, slot, context, weights, callback)
+			return request(self, slot, context, weights, function(resultContext, query, err)
+				if err then return callback(resultContext, query, err) end
+				local field = resultContext.controls["uri" .. resultContext.row_idx]
+				local url, marketErr = market.build(query)
+				if url then
+					field:SetText(url, true)
+				else
+					field:SetText("", true)
+				end
+				self.queryTab:SetNotice(resultContext.controls.pbNotice, marketErr or "")
+			end)
+		end)
+	end
+
+	PATCHES["TradeQuery"] = function(class)
+		local openTrade = class.PriceItem
+		if type(openTrade) == "function" then
+			class.PriceItem = keepArity(openTrade, function(self, ...)
+				openTrade(self, ...)
+				local c = self.controls
+				if c.tradeAuthButton then
+					c.tradeAuthButton.label = function() return "PoE1 国服市集" .. (market.league and " · " .. market.league or "") end
+					c.tradeAuthButton.enabled = false
+				end
+				for _, name in ipairs({ "realm", "realmLabel", "league", "leagueLabel", "tradeTypeSelection",
+						"tradeTypeSelectionLabel", "fetchCountEdit", "fetchCountLabel" }) do
+					if c[name] then c[name].shown = false end
+				end
+			end)
+		end
+		local displayRow = class.PriceItemRowDisplay
+		if type(displayRow) ~= "function" then return end
+		class.PriceItemRowDisplay = keepArity(displayRow, function(self, row, ...)
+			displayRow(self, row, ...)
+			local c = self.controls
+			local field, price, best = c["uri" .. row], c["priceButton" .. row], c["bestButton" .. row]
+			if not (field and price and best) then return end
+			local change = field.changeFunc
+			field.changeFunc = function(text, ...)
+				if change then change(text, ...) end
+				field.validURL = market.isUrl(text)
+			end
+			price.label = "Open Trade URL"
+			price.onClick = function()
+				if market.isUrl(field.buf) then OpenURL(field.buf) end
+			end
+			price.enabled = function() return market.isUrl(field.buf) end
+			price.tooltipFunc = nil
+			best.enabled = true
+		end)
+	end
+end
+
 -- Socket group list: its row labels are built from grantedEffect.name, i.e.
 -- straight out of Gems.lua as well.
 PATCHES["SkillListControl"] = function(class)

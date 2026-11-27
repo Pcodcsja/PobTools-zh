@@ -228,6 +228,7 @@ struct Server {
 		opt.game = game;
 		opt.locale = locale;
 		opt.hangWatch = cfg.hangWatch;
+		opt.poe1ChinaTrade = cfg.poe1ChinaTrade;
 		std::string err;
 		if (!child->Start(opt, err)) {
 			PobLog::Error("modernui", "browser mode: headless child did not start: " + err);

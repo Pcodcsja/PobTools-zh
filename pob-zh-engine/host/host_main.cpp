@@ -246,7 +246,7 @@ static void apply_engine_env(const LauncherConfig& cfg, const std::wstring& dir,
 	                        ResolveBackgroundPath(dir, look.background), look.bgBright, look.glassBlur,
 	                        look.treeBg, cfg.hangWatch,
 	                        cfg.pobFpsForeground, cfg.pobFpsBackground, cfg.perfLog,
-	                        DictSwitchesEnv(cfg));
+	                        DictSwitchesEnv(cfg), cfg.poe1ChinaTrade);
 }
 
 // An "Open in PoB" link (pob://<site>/<id> or pob2://...) started via the HKCU registration

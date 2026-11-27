@@ -4231,8 +4231,11 @@ local function trade_state(b)
 			results = results,
 		}
 	end
+	local cnMarket = PobToolsCnTrade
 	return {
-		authenticated = (main().api and main().api.authToken) and true or false,
+		authenticated = not cnMarket and (main().api and main().api.authToken) and true or false,
+		chinaTrade = cnMarket ~= nil,
+		chinaLeague = cnMarket and cnMarket.league,
 		authLabel = type(tq.loginStatus) == "function" and strip_escapes(tq.loginStatus()) or nil,
 		realm = dd(c.realm),
 		league = dd(c.league),
@@ -4757,6 +4760,11 @@ function M.buy_similar(p)
 	popup_discard(buy_popup)
 	buy_popup = nil
 	if not url or url == "" then error("POB could not build a search for that item", 0) end
+	if PobToolsCnTrade then
+		local mapped, err = PobToolsCnTrade.fromUrl(url, item)
+		if not mapped then error(err, 0) end
+		url = mapped
+	end
 	return { url = url, item = item.name, itemZh = tr(item.name), leagues = leagues, realms = realms }
 end
 
@@ -4836,6 +4844,7 @@ local function tj_state(b)
 		results[i] = { index = i, label = strip_escapes(r.label or ""), seed = r.seed, total = r.total, socketLabel = r.socketLabel }
 	end
 	return {
+		chinaTrade = (PobToolsCnTrade and c.searchTradeButton and c.searchMore and c.searchTradeLeagueSelect) ~= nil,
 		jewel = dd(c.jewelSelect),
 		conqueror = dd(c.conquerorSelect),
 		socket = dd(c.socketSelect),
@@ -4955,6 +4964,38 @@ function M.tj_result(p)
 	end
 	local item = list:GetJewelItem(data)
 	return { raw = type(item) == "table" and (item.raw or item:BuildRaw()) or tostring(item) }
+end
+
+-- Reuse PoB's search for exactly the selected result, including the conqueror
+-- and devotion filters. The WebView opens the returned URL.
+function M.tj_trade(p)
+	local b = ensure_build()
+	local c = tj_controls()
+	local market = PobToolsCnTrade
+	local i = tonumber(p and p.index)
+	local button, list = c.searchTradeButton, c.searchResults
+	if not (market and button and list and c.searchMore and c.searchTradeLeagueSelect
+			and i and (b.timelessData.searchResults or {})[i]) then
+		error("No result for Mainland China trade", 0)
+	end
+	local sel, highlight, last, label = list.selIndex, list.highlightIndex, button.lastSearch, button.label
+	local more, scrollToIndex = c.searchMore.state, list.ScrollToIndex
+	local getLeague = c.searchTradeLeagueSelect.GetSelValue
+	local originalCopy, originalOpen = Copy, OpenURL
+	local raw
+	list.selIndex, list.highlightIndex, button.lastSearch, c.searchMore.state = i, i, nil, false
+	list.ScrollToIndex = function() end
+	c.searchTradeLeagueSelect.GetSelValue = function() return "Standard" end
+	Copy, OpenURL = function(url) raw = url end, function() end
+	local ok, issue = pcall(button.onClick)
+	Copy, OpenURL = originalCopy, originalOpen
+	c.searchTradeLeagueSelect.GetSelValue = getLeague
+	list.ScrollToIndex = scrollToIndex
+	list.selIndex, list.highlightIndex, button.lastSearch, button.label, c.searchMore.state = sel, highlight, last, label, more
+	if not ok then error(issue, 0) end
+	local url, err = market.fromUrl(raw)
+	if not market.isUrl(url) then error(err or "PoB could not build a search for that jewel", 0) end
+	return { url = url }
 end
 
 -- tj_close{}: Cancel.

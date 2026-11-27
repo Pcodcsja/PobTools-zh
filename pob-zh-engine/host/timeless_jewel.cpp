@@ -1639,6 +1639,13 @@ int RunTimelessJewelSelfTest(const std::wstring& exeDir)
 		      "taiwan ignores the console platform entirely");
 		check(TradeSearchUrl(1, "Standard", 0, q1).find("www.pathofexile.tw") == std::string::npos,
 		      "taiwan never uses the redirecting www host");
+		const auto cn = TradeSearchUrl(kChinaTradeRealm, u8"S31赛季", 1, q1);
+		check(cn.find("https://poe.game.qq.com/trade/search/S31%E8%B5%9B%E5%AD%A3?q=") == 0 &&
+		      cn.find("%22option%22%3A%22any%22") != std::string::npos &&
+		      cn.find("explicit.pseudo_timeless_jewel_kaom") != std::string::npos &&
+		      cn.find("%22min%22%3A1234") != std::string::npos &&
+		      cn.find("%22max%22%3A1234") != std::string::npos,
+		      "China URL uses its PC league and status while keeping the exact seed filter");
 
 		// guards
 		check(TradeSearchUrl(0, "", 0, q1).empty(), "empty league yields no url");

@@ -24,9 +24,9 @@ void ShowTimelessJewel(const std::wstring& exeDir, const std::wstring& locale);
 // is exact, and its Ascendancy pick is exact and path-independent.
 constexpr int kMaxJewelType = 11;
 
-// trade site regions: same API shape and stat ids; only the host, league names
-// and console realms differ. Adding a region is one row here plus a
-// --tj-realm-check run to confirm its stat ids line up.
+inline constexpr int kChinaTradeRealm = 2;
+
+// Keep these indices stable: tj_ui.json stores the selected region by index.
 struct TradeRealm {
 	const char* label;    // UI label (zh-TW)
 	const char* host;     // for URL assembly
@@ -39,7 +39,7 @@ extern const int kTradeRealmCount;
 // One search cannot carry more than this many seed filters.
 constexpr size_t kMaxTradeSeeds = 40;
 
-// The ?q= payload. Language-independent: the same JSON works on every region.
+// The ?q= payload. TradeSearchUrl adapts the listed status for Mainland China.
 std::string TradeQueryJson(const std::string& tradeStatId, int seed);
 std::string TradeQueryJsonMulti(const std::string& tradeStatId, const std::vector<int>& seeds);
 

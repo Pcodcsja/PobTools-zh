@@ -125,6 +125,8 @@
 	/* 大陸使用者連 GitHub 常需代理;空值＝自動跟隨系統代理 */                                \
 	X(proxyLabel,        u8"HTTP 代理",                    u8"HTTP proxy")                            \
 	X(githubMirrorLabel, u8"啟用 GitHub 加速",             u8"Enable GitHub acceleration")            \
+	X(poe1ChinaTrade,     u8"PoE1 國服市集",               u8"PoE1 Mainland China trade")             \
+	X(poe1ChinaTradeHint, u8"下次啟動 PoB 時，搜尋及比價連結使用國服當期聯盟，並在瀏覽器開啟", u8"On the next PoB launch, open trade searches for the current Mainland China league in your browser") \
 	X(githubMirrorHint, u8"軟體及 PoB 更新經鏡像下載；失敗時切換其他站點或直連", u8"Use mirrors for app and PoB updates; fall back to another site or a direct connection") \
 	X(githubMirrorStation, u8"鏡像站",                     u8"Mirror site")                           \
 	X(githubMirrorStationHint, u8"選擇 GitHub 反向代理；延遲僅供參考", u8"Choose a GitHub reverse proxy; latency is approximate") \
@@ -215,6 +217,7 @@
 	   in every locale on purpose -- that IS what they are (user ruling). */      \
 	X(linkOfficialSite,  u8"官方網站",                     u8"Official site")                         \
 	X(linkTradePoe1,     u8"官方交易市集（PoE1）",         u8"Official trade (PoE1)")                 \
+	X(linkTradePoe1Cn,   u8"國服市集（PoE1）",             u8"Mainland China trade (PoE1)")           \
 	X(linkTradePoe2,     u8"官方交易市集（PoE2）",         u8"Official trade (PoE2)")                 \
 	X(linkDisenchant,    u8"拆粉查詢",                     u8"Disenchant lookup")                     \
 	/* Column head over our own tools; the other two columns are headed PoE1 and

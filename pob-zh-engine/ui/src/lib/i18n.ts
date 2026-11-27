@@ -222,6 +222,8 @@ const EN: Record<string, string> = {
   "trade.open": "Trade",
   "trade.title": "Trade for these items",
   "trade.hint": "POB's own price builder. Without logging in you can still generate weighted search links and open them on the trade site.",
+  "trade.china": "Mainland China trade",
+  "trade.chinaHint": "Generate a weighted search and open the results in your browser.",
   "trade.login": "Log in",
   "trade.logout": "Log out",
   "trade.realm": "Realm",
@@ -725,6 +727,10 @@ let ready: Promise<void> | null = null;
 // for locale "en", where there is nothing to swap).
 let locTable: Record<string, string> = {};
 let showEnglish = false;
+const chinaTradeLabels: Record<string, string> = {
+  "trade.china": "国服市集",
+  "trade.chinaHint": "生成加权搜索链接，在浏览器中打开结果。",
+};
 
 /**
  * F2's other half: the engine's switch turns POB's own strings back to English,
@@ -768,7 +774,8 @@ export function loadLocale(): Promise<void> {
 
 export function t(key: string, vars?: Record<string, string | number>): string {
   void lang.v; // the dependency that makes F2 re-render the caller
-  let s = table[key] ?? EN[key] ?? key;
+  const cnDefault = !showEnglish && locale() === "zh-rCN" ? chinaTradeLabels[key] : undefined;
+  let s = (cnDefault ? locTable[key] ?? cnDefault : table[key]) ?? EN[key] ?? key;
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, String(v));
   return s;
 }

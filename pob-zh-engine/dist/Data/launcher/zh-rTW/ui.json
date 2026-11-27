@@ -401,6 +401,8 @@
   "trade.open": "交易",
   "trade.title": "為這些物品找交易",
   "trade.hint": "POB 自己的查價面板。沒有登入也能產生加權搜尋連結,再到交易站開啟。",
+  "trade.china": "國服市集",
+  "trade.chinaHint": "產生加權搜尋連結，並在瀏覽器開啟結果。",
   "trade.login": "登入",
   "trade.logout": "登出",
   "trade.realm": "伺服器",

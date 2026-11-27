@@ -131,6 +131,7 @@ struct LinkEntry {
 static const LinkEntry kLinksPoe1[] = {
 	{ u8"官方網站",               L"https://www.pathofexile.com",       &LauncherStrings::linkOfficialSite },
 	{ u8"官方交易市集（PoE1）",   L"https://www.pathofexile.com/trade", &LauncherStrings::linkTradePoe1 },
+	{ u8"國服市集（PoE1）",       L"https://poe.game.qq.com/trade",    &LauncherStrings::linkTradePoe1Cn },
 	{ u8"PoeDB 流亡編年史",       L"https://poedb.tw" },
 	{ u8"PoE Wiki",               L"https://www.poewiki.net" },
 	{ u8"poe.ninja",              L"https://poe.ninja" },
@@ -1388,7 +1389,7 @@ LauncherResult ShowLauncher(LauncherConfig& cfg, InstallInfo& installs, const st
 		                        ResolveBackgroundPath(exeDir, look.background), look.bgBright, look.glassBlur,
 		                        look.treeBg, cfg.hangWatch,
 		                        cfg.pobFpsForeground, cfg.pobFpsBackground, cfg.perfLog,
-		                        DictSwitchesEnv(cfg));
+		                        DictSwitchesEnv(cfg), cfg.poe1ChinaTrade);
 		const std::wstring lua = poe2 ? installs.poe2Lua : installs.poe1Lua;
 		if (lua.empty()) {
 			// Nothing to launch and, until v0.28.0, nothing said about it: the
@@ -3103,6 +3104,9 @@ LauncherResult ShowLauncher(LauncherConfig& cfg, InstallInfo& installs, const st
 			// 3. network and updates -----------------------------------------------
 			section(2);
 			PobUi::CardBegin("##s3", navIcons[2], navLabels[2], nullptr, false, cardW);
+			PobUi::RowBegin(S.poe1ChinaTrade, S.poe1ChinaTradeHint, PobUi::SwitchWidth());
+			if (PobUi::Switch("##poe1chinatrade", &cfg.poe1ChinaTrade)) saveNow();
+			PobUi::RowEnd();
 			{
 				if (mirrorProbe.valid() && mirrorProbe.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
 					mirrorTimings = mirrorProbe.get();

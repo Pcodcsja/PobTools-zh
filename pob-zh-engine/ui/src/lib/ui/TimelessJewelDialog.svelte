@@ -82,6 +82,10 @@
     const r = await app.run(() => api.tjResult(index));
     if (r && (await copyText(r.raw))) app.notice = t("tj.copied");
   }
+  async function tradeJewel(index: number) {
+    const r = await app.run(() => api.tjTrade(index));
+    if (r?.url) window.open(r.url, "_blank", "noopener");
+  }
   async function socketJewel(index: number) {
     const r = await app.run(() => api.tjResult(index, "socket"));
     if (r) {
@@ -184,6 +188,9 @@
               <span class="dim">{r.socketLabel ?? ""}</span>
               <span class="grow"></span>
               <span class="num">{Math.round(r.total)}</span>
+              {#if st.chinaTrade}
+                <button class="btn ghost sm" onclick={() => tradeJewel(r.index)}>{t("trade.china")}</button>
+              {/if}
               <button class="btn ghost sm" onclick={() => copyJewel(r.index)}>{t("tj.copy")}</button>
               <button class="btn ghost sm" onclick={() => socketJewel(r.index)}>{t("tj.socketIt")}</button>
             </div>

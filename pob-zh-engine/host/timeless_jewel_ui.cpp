@@ -68,7 +68,8 @@ std::string url_encode(const std::string& s)
 	static const char* hex = "0123456789ABCDEF";
 	std::string out;
 	for (unsigned char c : s) {
-		if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') out += (char)c;
+		if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
+		    c == '-' || c == '_' || c == '.' || c == '~') out += (char)c;
 		else { out += '%'; out += hex[c >> 4]; out += hex[c & 15]; }
 	}
 	return out;
@@ -76,12 +77,12 @@ std::string url_encode(const std::string& s)
 
 } // namespace
 
-// trade realms: every conqueror the calculator offers exists on both regions with the same id (--tj-realm-check re-proves it).
 const TradeRealm kTradeRealms[] = {
 	// NOTE: the .tw site answers on the bare host; www.pathofexile.tw 301s to it,
 	// so use the canonical one and save a redirect.
 	{ u8"國際服", "www.pathofexile.com", L"www.pathofexile.com", true },
 	{ u8"台服",   "pathofexile.tw",      L"pathofexile.tw",      false },
+	{ u8"國服",   "poe.game.qq.com",     L"poe.game.qq.com",     false },
 };
 const int kTradeRealmCount = (int)(sizeof(kTradeRealms) / sizeof(kTradeRealms[0]));
 
@@ -135,8 +136,15 @@ std::string TradeSearchUrl(int realmIdx, const std::string& league, int platform
 	const TradeRealm& r = kTradeRealms[realmIdx];
 	const char* console = "";
 	if (r.consoles) console = platform == 1 ? "xbox/" : platform == 2 ? "sony/" : "";
+	std::string query = queryJson;
+	if (realmIdx == kChinaTradeRealm) {
+		auto doc = nlohmann::json::parse(queryJson, nullptr, false);
+		if (!doc.is_object() || !doc.contains("query") || !doc["query"].is_object()) return {};
+		doc["query"]["status"] = {{"option", "any"}};
+		query = doc.dump();
+	}
 	return "https://" + std::string(r.host) + "/trade/search/" + console +
-	       url_encode(league) + "?q=" + url_encode(queryJson);
+	       url_encode(league) + "?q=" + url_encode(query);
 }
 
 // TjUiState
@@ -214,22 +222,14 @@ struct LeagueFetch {
 			std::string body, err;
 			std::vector<std::pair<std::string, std::string>> got;
 			if (c.valid() && c.GetString(L"/api/trade/data/leagues", body, &err)) {
-				size_t p = 0;
-				while ((p = body.find("\"id\":\"", p)) != std::string::npos) {
-					p += 6;
-					size_t e = body.find('"', p);
-					if (e == std::string::npos) break;
-					std::string id = body.substr(p, e - p);
-					std::string realm = "pc";
-					size_t r = body.find("\"realm\":\"", e);
-					size_t nextId = body.find("\"id\":\"", e);
-					if (r != std::string::npos && (nextId == std::string::npos || r < nextId)) {
-						r += 9;
-						size_t re = body.find('"', r);
-						if (re != std::string::npos) realm = body.substr(r, re - r);
+				const auto doc = nlohmann::json::parse(body, nullptr, false);
+				if (doc.is_object() && doc.contains("result") && doc["result"].is_array()) {
+					for (const auto& row : doc["result"]) {
+						if (!row.is_object() || !row.contains("id") || !row["id"].is_string()) continue;
+						const auto realm = row.find("realm");
+						got.emplace_back(realm != row.end() && realm->is_string() ? realm->get<std::string>() : "pc",
+						                 row["id"].get<std::string>());
 					}
-					got.emplace_back(std::move(realm), std::move(id));
-					p = e;
 				}
 			}
 			all = std::move(got);
@@ -238,6 +238,7 @@ struct LeagueFetch {
 	}
 	// League ids for one platform, API order (current league first), deduped.
 	std::vector<std::string> ForPlatform(int platform) const {
+		if (!done.load()) return {};
 		const char* want = platform == 1 ? "xbox" : platform == 2 ? "sony" : "pc";
 		std::vector<std::string> out;
 		for (const auto& kv : all) {
@@ -621,7 +622,11 @@ public:
 		if (tjUi.Load(exeDir)) {
 			tradeRealm = std::clamp(tjUi.realm, 0, kTradeRealmCount - 1);
 			tradePlatform = kTradeRealms[tradeRealm].consoles ? std::clamp(tjUi.platform, 0, 2) : 0;
+			if (tradeRealm == kChinaTradeRealm) tradeLeague.clear();
 			if (!tjUi.league.empty()) { tradeLeague = tjUi.league; leagueUserSet = true; }
+		} else if (LoadLauncherConfig(exeDir + L"pob-zh.ini").poe1ChinaTrade) {
+			tradeRealm = kChinaTradeRealm;
+			tradeLeague.clear();
 		}
 		leagues.SetHost(kTradeRealms[tradeRealm].hostW);
 
@@ -1059,14 +1064,16 @@ public:
 		section(u8"區域");
 		indent();
 		{
-			const char* realms[2] = { kTradeRealms[0].label, kTradeRealmCount > 1 ? kTradeRealms[1].label : "" };
+			std::vector<const char*> realms;
+			for (int i = 0; i < kTradeRealmCount; ++i) realms.push_back(kTradeRealms[i].label);
 			int sel = tradeRealm;
-			if (PobUi::Segmented("##realm", &sel, realms, (std::min)(kTradeRealmCount, 2)) && sel != tradeRealm) {
+			if (PobUi::Segmented("##realm", &sel, realms.data(), kTradeRealmCount) && sel != tradeRealm) {
 				tradeRealm = sel;
 				// League names are region-specific, so the current pick and the
 				// cached list are both meaningless now: refetch and re-default.
 				if (!kTradeRealms[sel].consoles) tradePlatform = 0;
 				leagues.SetHost(kTradeRealms[sel].hostW);
+				tradeLeague = sel == kChinaTradeRealm ? "" : "Standard";
 				leagueUserSet = false;
 				saveTjUi();
 			}
@@ -1098,7 +1105,8 @@ public:
 			} else {
 				PobUi::PushControlFrame();
 				ImGui::SetNextItemWidth(fw);
-				if (ImGui::InputTextWithHint("##league", u8"聯盟名稱（例：Standard）", &tradeLeague)) leagueUserSet = true;
+				const char* hint = tradeRealm == kChinaTradeRealm ? u8"聯盟名稱（例：永久）" : u8"聯盟名稱（例：Standard）";
+				if (ImGui::InputTextWithHint("##league", hint, &tradeLeague)) leagueUserSet = true;
 				if (ImGui::IsItemDeactivatedAfterEdit()) saveTjUi();
 				PobUi::PopControlFrame();
 			}
@@ -3086,7 +3094,7 @@ private:
 		if (testMode_) return;   // a test run writes nothing
 		tjUi.realm = tradeRealm;
 		tjUi.platform = tradePlatform;
-		tjUi.league = tradeLeague;
+		tjUi.league = leagueUserSet ? tradeLeague : std::string();
 		tjUi.Save(exeDir);
 	}
 
