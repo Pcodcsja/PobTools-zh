@@ -1,5 +1,6 @@
 {
   "entries": {
+    "{0}% increased Armour from Equipped Helmet": "已装备的头盔的护甲提高 {0}%",
     " (base life for a level {0} monster)": " ({0} 级怪物基础生命)",
     " Animated Minions' Melee Attacks deal {0} more Damage to surrounding targets": "幻化类召唤生物的近战攻击对周围目标造成的总伤害额外提高 {0}",
     " Animated Minions' Melee Attacks deal {0}% more Damage to surrounding targets": "幻化类召唤生物的近战攻击对周围目标造成的伤害总增 {0}%",
@@ -12296,6 +12297,7 @@
     "Hits have {0}% additional Critical Strike Chance against you": "对你的击中暴击率额外 {0}%",
     "Hits have {0}% chance to deal {1}% more Area Damage": "击中有 {0}% 的几率造成总增 {1}% 的范围伤害",
     "Hits have {0}% chance to ignore Enemy Monster Physical Damage Reduction": "击中有 {0}% 的几率忽略敌方怪物的物理伤害减免",
+    "Hits have {0}% chance to treat Enemy Monster Lightning Resistance values as inverted": "击中有 {0}% 的几率将敌方怪物的闪电抗性视作反转",
     "Hits have {0}% chance to ignore Enemy Physical Damage Reduction": "击中有 {0}% 的几率忽略敌方怪物的物理伤害减免",
     "Hits have {0}% chance to ignore Enemy Physical Damage Reduction while you have Sacrificial Zeal": "拥有热情牺牲时，击中有 {0}% 的几率忽略敌人的物理伤害减免",
     "Hits have {0}% chance to treat Enemy Monster Elemental Resistance values as inverted": "击中有 {0}% 的几率将敌方怪物的元素抗性视作反转",

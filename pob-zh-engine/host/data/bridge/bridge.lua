@@ -5413,7 +5413,10 @@ function M.craft_item_options()
 	local cap = capture_popup(function() tab:CraftItem() end, false)
 	local rarities = {}
 	for i, e in ipairs(cap.controls.rarity.list) do
-		rarities[i] = { label = dd_label(e), labelZh = tr(strip_escapes(dd_label(e))), rarity = e.rarity }
+		local label = dd_label(e)
+		local key = "Craft Item Rarity: " .. e.rarity
+		local localized = tr(key)
+		rarities[i] = { label = label, labelZh = localized ~= key and localized or tr(strip_escapes(label)), rarity = e.rarity }
 	end
 	local types = {}
 	for i, t in ipairs(b.data.itemBaseTypeList) do

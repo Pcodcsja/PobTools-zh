@@ -727,9 +727,19 @@ let ready: Promise<void> | null = null;
 // for locale "en", where there is nothing to swap).
 let locTable: Record<string, string> = {};
 let showEnglish = false;
-const chinaTradeLabels: Record<string, string> = {
+const zhCnDefaults: Record<string, string> = {
   "trade.china": "国服市集",
   "trade.chinaHint": "生成加权搜索链接，在浏览器中打开结果。",
+  "items.weaponSet1": "武器组 I",
+  "items.weaponSet2": "武器组 II",
+  "items.none": "（空）",
+  "items.craft": "制作",
+  "items.craftTitle": "创建物品",
+  "items.craftRarity": "稀有度",
+  "items.craftName": "名称",
+  "items.craftType": "类型",
+  "items.craftBase": "基底",
+  "items.craftCreate": "创建",
 };
 
 /**
@@ -774,7 +784,7 @@ export function loadLocale(): Promise<void> {
 
 export function t(key: string, vars?: Record<string, string | number>): string {
   void lang.v; // the dependency that makes F2 re-render the caller
-  const cnDefault = !showEnglish && locale() === "zh-rCN" ? chinaTradeLabels[key] : undefined;
+  const cnDefault = !showEnglish && locale() === "zh-rCN" ? zhCnDefaults[key] : undefined;
   let s = (cnDefault ? locTable[key] ?? cnDefault : table[key]) ?? EN[key] ?? key;
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, String(v));
   return s;

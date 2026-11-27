@@ -1254,6 +1254,55 @@ if gameRules.installChinaTrade then
 	if not ok then log("PoE1 China trade: " .. tostring(err)) end
 end
 
+if GAME == "poe1" then
+	local ok, buy = pcall(require, "Classes.CompareBuySimilar")
+	if ok and type(buy) == "table" and type(buy.openPopup) == "function" and type(buy.addModEntries) == "function" then
+		local openBuy = buy.openPopup
+		buy.openPopup = function(...)
+			local addMods, openPopup = buy.addModEntries, main.OpenPopup
+			local fullRows = {}
+			buy.addModEntries = function(...)
+				local entries = addMods(...)
+				for i, entry in ipairs(entries) do
+					fullRows[i] = { unpack(entry.formattedLines or {}) }
+				end
+				return entries
+			end
+			main.OpenPopup = function(self, width, height, title, controls, ...)
+				for i, lines in ipairs(fullRows) do
+					local label = controls and controls["mod" .. i .. "Label"]
+					local original = label and label.label
+					if type(original) == "string" then
+						local localized
+						label.label = function()
+							if not translateOn() then return original end
+							if localized then return localized end
+							local visible = {}
+							for line in original:gmatch("[^\n]+") do visible[#visible + 1] = line end
+							for j, line in ipairs(lines) do
+								-- PoB truncates long English rows before drawing. Look up the full stat.
+								local _, text = splitLeadColour(line)
+								local zh = zhByStat(text, "item") or zhGlobal(text) or zhRaw(text)
+								if zh and zh ~= text then
+									local lead = splitLeadColour(visible[j] or line)
+									visible[j] = lead .. zh
+								end
+							end
+							localized = table.concat(visible, "\n")
+							return localized
+						end
+					end
+				end
+				return openPopup(self, width, height, title, controls, ...)
+			end
+			local success, result = pcall(openBuy, ...)
+			buy.addModEntries, main.OpenPopup = addMods, openPopup
+			if not success then error(result, 0) end
+			return result
+		end
+	end
+end
+
 if PobToolsCnTrade then
 	local market = PobToolsCnTrade
 	PATCHES["TradeQueryGenerator"] = function(class)
